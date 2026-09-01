@@ -1,0 +1,31 @@
+services:
+  - type: web
+    name: divya-chakshu-backend
+    runtime: python
+    rootDir: backend
+
+    # Render free tier uses Python 3.11 by default — pin it explicitly
+    buildCommand: >
+      pip install -r requirements.txt &&
+      pip install "facenet-pytorch==2.6.0" --no-deps
+
+    startCommand: uvicorn app:app --host 0.0.0.0 --port $PORT
+
+    # Free tier: 512 MB RAM — models load lazily on first request
+    plan: free
+
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11.9"
+      # Tell HuggingFace to cache models in a writable temp dir on Render
+      - key: HF_HOME
+        value: /tmp/hf_cache
+      # Suppress symlink warnings from transformers on Linux
+      - key: TRANSFORMERS_CACHE
+        value: /tmp/hf_cache
+      # Disable HuggingFace telemetry
+      - key: HF_HUB_DISABLE_TELEMETRY
+        value: "1"
+      # Force CPU inference (Render free tier has no GPU)
+      - key: CUDA_VISIBLE_DEVICES
+        value: ""

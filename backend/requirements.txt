@@ -2,25 +2,21 @@ fastapi==0.115.0
 uvicorn[standard]==0.30.6
 python-multipart==0.0.9
 
-# Pillow — use a version that ships Python 3.14 wheels (no build-from-source)
-# facenet-pytorch 2.6.0 declares <10.3.0 but that constraint is wrong for Py3.14;
-# we install facenet-pytorch --no-deps below and supply Pillow ourselves.
 pillow>=10.4.0
-
 numpy>=2.3
 
-# ML stack
-torch>=2.5
-torchvision>=0.20
-transformers>=4.45
+# CPU-only torch — avoids downloading 1.5 GB of CUDA libs on Render's servers.
+# ~250 MB vs ~1.7 GB for the CUDA build. Render has no GPU anyway.
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch==2.5.1+cpu
+torchvision==0.20.1+cpu
 
-# facenet-pytorch: install WITHOUT its Pillow constraint via the line below.
-# Run:  pip install facenet-pytorch==2.6.0 --no-deps
-# (see install.bat / instructions in README)
+transformers>=4.45,<5.0.0
 
-# Gender models — all downloaded automatically by transformers on first run.
-# No extra pip install needed (HuggingFace model weights cached in ~/.cache/huggingface):
-#   1. rizvandwiki/gender-classification    (ViT-B/16,  primary,   weight 0.45)
-#   2. rizvandwiki/gender-classification-2  (ViT-L/16,  secondary, weight 0.40)
-#   3. prithivMLmods/Gender-Classifier-Mini (SigLIP2,   tertiary,  weight 0.15)
-# First-run download is ~2.5 GB total (larger than v2 due to ViT-L model ~1.2 GB extra).
+# facenet-pytorch: installed without its stale Pillow constraint.
+# The build command in render.yaml runs two pip install steps to handle this.
+
+# HuggingFace gender models (auto-downloaded on first request, not at build time):
+#   1. rizvandwiki/gender-classification    (ViT-B/16, ~330 MB)
+#   2. rizvandwiki/gender-classification-2  (ViT-L/16, ~1.2 GB)
+#   3. prithivMLmods/Gender-Classifier-Mini (SigLIP2,  ~900 MB)
