@@ -1,0 +1,65 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── CSS variables — Light theme (default) ───────────────────────────────── */
+:root,
+.light {
+  --bg-primary:    #f8fafc;
+  --bg-secondary:  #f1f5f9;
+  --bg-card:       #ffffff;
+  --bg-hover:      #e2e8f0;
+  --border-subtle: rgba(0,0,0,0.07);
+  --border-card:   rgba(0,0,0,0.10);
+  --tx-primary:    #0f172a;
+  --tx-secondary:  #475569;
+  --tx-muted:      #94a3b8;
+}
+
+/* ── Dark theme override ─────────────────────────────────────────────────── */
+.dark {
+  --bg-primary:    #0d0d1a;
+  --bg-secondary:  #12122a;
+  --bg-card:       #161630;
+  --bg-hover:      #1c1c3a;
+  --border-subtle: rgba(255,255,255,0.06);
+  --border-card:   rgba(255,255,255,0.09);
+  --tx-primary:    #f1f5f9;
+  --tx-secondary:  #94a3b8;
+  --tx-muted:      #475569;
+}
+
+* { box-sizing: border-box; }
+
+html {
+  scrollbar-width: thin;
+  scrollbar-color: #8b5cf640 transparent;
+}
+::-webkit-scrollbar        { width: 4px; height: 4px; }
+::-webkit-scrollbar-track  { background: transparent; }
+::-webkit-scrollbar-thumb  { background: #8b5cf640; border-radius: 99px; }
+
+body {
+  background: var(--bg-primary);
+  color: var(--tx-primary);
+  font-family: "Inter", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  transition: background 0.25s, color 0.25s;
+}
+
+/* Shimmer skeleton */
+.skeleton {
+  background: linear-gradient(90deg,
+    var(--bg-hover) 25%,
+    var(--bg-card)  50%,
+    var(--bg-hover) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 2s linear infinite;
+}
+
+@keyframes shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
