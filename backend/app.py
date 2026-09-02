@@ -56,12 +56,12 @@ app.add_middleware(
 engine = None
 load_error = None
 try:
-    logger.info("Loading models…")
+    logger.info("Initialising engine (models load lazily on first request)…")
     engine = DivyaChakshuEngine()
-    logger.info("Models ready.")
+    logger.info("Engine ready — models will load on first /api/predict call.")
 except Exception as exc:
     load_error = str(exc)
-    logger.exception("Failed to load models")
+    logger.exception("Failed to initialise engine")
 
 
 # ── helpers ───────────────────────────────────────────────────────────────────
@@ -100,11 +100,13 @@ def root():
 
 @app.get("/api/health")
 def health():
+    loaded = engine is not None and engine._loaded
     return {
-        "status":       "ok" if engine else "error",
-        "models_loaded": engine is not None,
-        "error":        load_error,
-        "device":       str(engine.device) if engine else None,
+        "status":        "ok" if engine else "error",
+        "models_loaded": loaded,
+        "loading":       engine is not None and not engine._loaded,
+        "error":         load_error,
+        "device":        str(engine.device) if engine else None,
     }
 
 

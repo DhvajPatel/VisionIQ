@@ -2,15 +2,14 @@ import React from "react";
 import { motion } from "framer-motion";
 
 const MODELS = [
-  { name: "MTCNN Face Detector",      role: "Face detection",           icon: "🔍" },
-  { name: "ViT-B/16 Gender (Primary)",role: "Male / Female — primary",  icon: "🧠" },
-  { name: "ViT-L/16 Gender (Secondary)", role: "Male / Female — secondary", icon: "🧠" },
-  { name: "SigLIP2 Gender (Tertiary)", role: "Male / Female — tertiary", icon: "🔬" },
-  { name: "ResNet50 ImageNet",         role: "Animal recognition",       icon: "🐾" },
+  { name: "MTCNN Face Detector",        role: "Face detection",      icon: "🔍" },
+  { name: "ViT-B/16 Gender Classifier", role: "Male / Female",       icon: "🧠" },
+  { name: "ResNet50 ImageNet",          role: "Animal recognition",  icon: "🐾" },
 ];
 
 export default function ModelStatusCard({ health }) {
   const loaded  = health?.models_loaded;
+  const loading = health?.loading;
   const unknown = health === null;
 
   return (
@@ -45,17 +44,25 @@ export default function ModelStatusCard({ health }) {
         <div className={`inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1 rounded-full mt-1 ${
           unknown
             ? "bg-slate-700/50 text-slate-400"
-            : loaded
-              ? "bg-accent-green/15 text-accent-green"
-              : "bg-red-500/15 text-red-400"
+            : loading
+              ? "bg-amber-500/15 text-amber-400"
+              : loaded
+                ? "bg-accent-green/15 text-accent-green"
+                : "bg-red-500/15 text-red-400"
         }`}>
           <span className={`w-1.5 h-1.5 rounded-full ${
-            unknown ? "bg-slate-400" : loaded ? "bg-accent-green animate-pulse" : "bg-red-400"
+            unknown ? "bg-slate-400" : loading ? "bg-amber-400 animate-pulse" : loaded ? "bg-accent-green animate-pulse" : "bg-red-400"
           }`} />
-          {unknown ? "Checking…" : loaded ? "Active & Optimal" : "Offline"}
+          {unknown ? "Checking…" : loading ? "Loading…" : loaded ? "Active & Ready" : "Offline"}
         </div>
         <p className="text-[11px] text-tx-muted mt-1.5 leading-snug">
-          {unknown ? "Connecting to backend…" : loaded ? "All 5 models running" : health?.error || "Models failed to load"}
+          {unknown
+            ? "Connecting to backend…"
+            : loading
+              ? "Downloading model weights (~400 MB)…"
+              : loaded
+                ? "All 3 models running"
+                : health?.error || "Models failed to load"}
         </p>
       </div>
 
@@ -70,10 +77,13 @@ export default function ModelStatusCard({ health }) {
             <motion.span
               initial={{ scale: 0.8 }} animate={{ scale: 1 }}
               className={`shrink-0 text-[10px] px-2 py-0.5 rounded-full ${
-                unknown ? "bg-slate-700 text-slate-400" : loaded ? "bg-accent-green/15 text-accent-green" : "bg-red-500/15 text-red-400"
+                unknown  ? "bg-slate-700 text-slate-400"
+                : loading ? "bg-amber-500/15 text-amber-400"
+                : loaded  ? "bg-accent-green/15 text-accent-green"
+                : "bg-red-500/15 text-red-400"
               }`}
             >
-              {unknown ? "…" : loaded ? "Ready" : "Err"}
+              {unknown ? "…" : loading ? "Loading" : loaded ? "Ready" : "Err"}
             </motion.span>
           </div>
         ))}

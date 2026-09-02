@@ -95,16 +95,30 @@ export default function Sidebar({ active, onNav, health }) {
         <div className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl border transition-all ${
           loaded
             ? "border-accent-green/30 bg-accent-green/5"
-            : health === null
-              ? "border-border-card bg-bg-card"
-              : "border-red-500/30 bg-red-500/5"
+            : health?.loading
+              ? "border-amber-500/30 bg-amber-500/5"
+              : health === null
+                ? "border-border-card bg-bg-card"
+                : "border-red-500/30 bg-red-500/5"
         }`}>
           <span className={`w-2 h-2 rounded-full shrink-0 ${
-            loaded ? "bg-accent-green animate-pulse" : health === null ? "bg-slate-500 skeleton" : "bg-red-400"
+            loaded
+              ? "bg-accent-green animate-pulse"
+              : health?.loading
+                ? "bg-amber-400 animate-pulse"
+                : health === null
+                  ? "bg-slate-500 skeleton"
+                  : "bg-red-400"
           }`} />
           <div className="leading-tight min-w-0">
             <p className="text-[11px] font-medium text-tx-primary truncate">
-              {loaded ? "Models Ready" : health === null ? "Connecting…" : "Models Offline"}
+              {loaded
+                ? "Models Ready"
+                : health?.loading
+                  ? "Loading models…"
+                  : health === null
+                    ? "Connecting…"
+                    : "Models Offline"}
             </p>
             {health?.device && (
               <p className="text-[10px] text-tx-muted font-mono">{health.device}</p>

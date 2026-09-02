@@ -166,14 +166,28 @@ export default function App() {
             <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs font-medium transition-all ${
               health?.models_loaded
                 ? "border-accent-green/40 text-accent-green bg-accent-green/10"
-                : health === null
-                  ? "border-border-card text-tx-muted bg-bg-card"
-                  : "border-red-500/40 text-red-400 bg-red-500/10"
+                : health?.loading
+                  ? "border-amber-500/40 text-amber-400 bg-amber-500/10"
+                  : health === null
+                    ? "border-border-card text-tx-muted bg-bg-card"
+                    : "border-red-500/40 text-red-400 bg-red-500/10"
             }`}>
               <span className={`w-1.5 h-1.5 rounded-full ${
-                health?.models_loaded ? "bg-accent-green animate-pulse" : health === null ? "bg-slate-500" : "bg-red-400"
+                health?.models_loaded
+                  ? "bg-accent-green animate-pulse"
+                  : health?.loading
+                    ? "bg-amber-400 animate-pulse"
+                    : health === null
+                      ? "bg-slate-500"
+                      : "bg-red-400"
               }`} />
-              {health?.models_loaded ? "Models Active" : health === null ? "Connecting…" : "Models Offline"}
+              {health?.models_loaded
+                ? "Models Active"
+                : health?.loading
+                  ? "Loading models…"
+                  : health === null
+                    ? "Connecting…"
+                    : "Models Offline"}
             </div>
           </div>
         </header>
