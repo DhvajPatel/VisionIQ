@@ -1,0 +1,9 @@
+{
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "installCommand": "npm install && chmod -R +x node_modules/.bin",
+  "framework": "vite",
+  "rewrites": [
+    { "source": "/api/:path*", "destination": "https://visioniq-backend-89zb.onrender.com/api/:path*" }
+  ]
+}
