@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: divya-chakshu-backend
+    name: visioniq-backend
     runtime: python
     rootDir: backend
 

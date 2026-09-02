@@ -1,5 +1,5 @@
 """
-FastAPI server for Divya-Chakshu 2.0
+FastAPI server for VisionIQ
 Endpoints:
   GET  /api/health          -> model status
   POST /api/predict         -> image upload -> prediction
@@ -17,7 +17,7 @@ from PIL import Image
 from pipeline import DivyaChakshuEngine
 
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("divya-chakshu")
+logger = logging.getLogger("visioniq")
 
 # ── database ──────────────────────────────────────────────────────────────────
 DB_PATH = Path(__file__).parent / "history.db"
@@ -45,7 +45,7 @@ def init_db():
 init_db()
 
 # ── app ───────────────────────────────────────────────────────────────────────
-app = FastAPI(title="Divya-Chakshu 2.0 API")
+app = FastAPI(title="VisionIQ API")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -91,7 +91,7 @@ def image_to_b64(image: Image.Image, max_w=400) -> str:
 @app.get("/")
 def root():
     return {
-        "app": "Divya Chakshu 2.0",
+        "app": "VisionIQ",
         "status": "running",
         "frontend": "http://localhost:5173",
         "docs": "http://localhost:8000/docs",
@@ -120,7 +120,11 @@ async def predict(file: UploadFile = File(...)):
         raise HTTPException(400, "Not a readable image.")
 
     t0     = time.perf_counter()
-    result = engine.predict(image)
+    try:
+        result = engine.predict(image)
+    except Exception as exc:
+        logger.exception("Prediction failed")
+        raise HTTPException(500, f"Prediction failed: {exc}")
     proc_ms = (time.perf_counter() - t0) * 1000
 
     if result.category == "person":

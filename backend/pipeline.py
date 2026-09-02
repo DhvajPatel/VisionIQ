@@ -46,6 +46,11 @@ ANIMAL_CLASS_MAX_INDEX = 397
 # MTCNN minimum detection confidence.
 FACE_CONFIDENCE_THRESHOLD = 0.85
 
+# Maximum faces to run gender classification on per image.
+# Caps CPU time for group photos (e.g. 23 faces × 6 passes = ~125 s).
+# Faces are ranked by MTCNN confidence; top N are processed.
+MAX_FACES = 10
+
 # How far below chin to extend context crop (fraction of face height).
 # Reduced from 1.2 → 0.6 to limit background noise for adults.
 BODY_CONTEXT_FACTOR = 0.6
@@ -321,29 +326,40 @@ class DivyaChakshuEngine:
 
         faces: List[FaceResult] = []
         if boxes is not None:
-            for box, prob in zip(boxes, probs):
-                if prob is None or prob < FACE_CONFIDENCE_THRESHOLD:
-                    continue
+            # Filter to confident detections first
+            candidates = [
+                (box, prob) for box, prob in zip(boxes, probs)
+                if prob is not None and prob >= FACE_CONFIDENCE_THRESHOLD
+            ]
 
+            # Sort by confidence desc, cap at MAX_FACES to keep CPU time bounded
+            candidates.sort(key=lambda x: x[1], reverse=True)
+            candidates = candidates[:MAX_FACES]
+
+            for box, prob in candidates:
                 x0, y0, x1, y1 = [int(max(v, 0)) for v in box]
                 x1 = min(x1, image.width)
                 y1 = min(y1, image.height)
                 if x1 <= x0 or y1 <= y0:
                     continue
 
-                # Build both crops
-                face_crop = self._tight_face_crop(image, [x0, y0, x1, y1])
-                ctx_crop  = self._context_crop(image,   [x0, y0, x1, y1])
+                try:
+                    # Build both crops
+                    face_crop = self._tight_face_crop(image, [x0, y0, x1, y1])
+                    ctx_crop  = self._context_crop(image,   [x0, y0, x1, y1])
 
-                # Weighted ensemble with dual-crop + temperature sharpening
-                gender, gender_conf = self._weighted_ensemble(face_crop, ctx_crop)
+                    # Weighted ensemble with dual-crop + temperature sharpening
+                    gender, gender_conf = self._weighted_ensemble(face_crop, ctx_crop)
 
-                faces.append(FaceResult(
-                    box=[x0, y0, x1, y1],
-                    face_confidence=round(float(prob), 4),
-                    gender=gender,
-                    gender_confidence=gender_conf,
-                ))
+                    faces.append(FaceResult(
+                        box=[x0, y0, x1, y1],
+                        face_confidence=round(float(prob), 4),
+                        gender=gender,
+                        gender_confidence=gender_conf,
+                    ))
+                except Exception as exc:
+                    logger.warning("Skipping face at box %s due to error: %s", [x0, y0, x1, y1], exc)
+                    continue
 
         if faces:
             return PredictionResult(category="person", faces=faces)

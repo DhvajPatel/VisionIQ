@@ -2,9 +2,11 @@ import React from "react";
 import { motion } from "framer-motion";
 
 const MODELS = [
-  { name: "MTCNN Face Detector",    role: "Face detection" },
-  { name: "ViT Gender Classifier",  role: "Male / Female" },
-  { name: "ResNet50 ImageNet",       role: "Animal recognition" },
+  { name: "MTCNN Face Detector",      role: "Face detection",           icon: "🔍" },
+  { name: "ViT-B/16 Gender (Primary)",role: "Male / Female — primary",  icon: "🧠" },
+  { name: "ViT-L/16 Gender (Secondary)", role: "Male / Female — secondary", icon: "🧠" },
+  { name: "SigLIP2 Gender (Tertiary)", role: "Male / Female — tertiary", icon: "🔬" },
+  { name: "ResNet50 ImageNet",         role: "Animal recognition",       icon: "🐾" },
 ];
 
 export default function ModelStatusCard({ health }) {
@@ -53,20 +55,21 @@ export default function ModelStatusCard({ health }) {
           {unknown ? "Checking…" : loaded ? "Active & Optimal" : "Offline"}
         </div>
         <p className="text-[11px] text-tx-muted mt-1.5 leading-snug">
-          {unknown ? "Connecting to backend…" : loaded ? "All systems running perfectly" : health?.error || "Models failed to load"}
+          {unknown ? "Connecting to backend…" : loaded ? "All 5 models running" : health?.error || "Models failed to load"}
         </p>
       </div>
 
-      <div className="space-y-2">
+      <div className="space-y-1.5">
         {MODELS.map((m) => (
-          <div key={m.name} className="flex items-center justify-between text-xs">
-            <div>
-              <p className="text-tx-secondary font-medium">{m.name}</p>
-              <p className="text-tx-muted">{m.role}</p>
+          <div key={m.name} className="flex items-center gap-2 text-xs">
+            <span className="text-sm leading-none shrink-0">{m.icon}</span>
+            <div className="flex-1 min-w-0">
+              <p className="text-tx-secondary font-medium truncate">{m.name}</p>
+              <p className="text-tx-muted text-[10px] truncate">{m.role}</p>
             </div>
             <motion.span
               initial={{ scale: 0.8 }} animate={{ scale: 1 }}
-              className={`text-[10px] px-2 py-0.5 rounded-full ${
+              className={`shrink-0 text-[10px] px-2 py-0.5 rounded-full ${
                 unknown ? "bg-slate-700 text-slate-400" : loaded ? "bg-accent-green/15 text-accent-green" : "bg-red-500/15 text-red-400"
               }`}
             >

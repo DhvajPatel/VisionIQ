@@ -36,12 +36,29 @@ export default function App() {
   // session stats
   const [stats, setStats] = useState({ totalAnalyses: 0, imagesProcessed: 0 });
 
+  // Poll health every 5 s until models are loaded, then every 30 s
   useEffect(() => {
-    fetch(`${API_BASE}/api/health`)
-      .then((r) => r.json())
-      .then(setHealth)
-      .catch(() => setHealth({ status: "unreachable", models_loaded: false }));
+    let timer;
+    const checkHealth = () => {
+      fetch(`${API_BASE}/api/health`)
+        .then((r) => r.json())
+        .then((data) => {
+          setHealth(data);
+          // Keep polling every 5 s while models are still loading
+          timer = setTimeout(checkHealth, data.models_loaded ? 30000 : 5000);
+        })
+        .catch(() => {
+          setHealth((prev) => prev === null ? { status: "unreachable", models_loaded: false } : prev);
+          // Retry every 5 s when backend is unreachable
+          timer = setTimeout(checkHealth, 5000);
+        });
+    };
+    checkHealth();
+    return () => clearTimeout(timer);
   }, []);
+
+  // prediction timeout (ms) — 3 min for large group images on CPU
+  const PREDICT_TIMEOUT_MS = 180_000;
 
   const handleFile = useCallback(async (file) => {
     if (!file) return;
@@ -56,22 +73,40 @@ export default function App() {
     fd.append("file", file);
     const t0 = performance.now();
 
-    try {
-      const res  = await fetch(`${API_BASE}/api/predict`, { method: "POST", body: fd });
-      const data = await res.json();
-      const ms   = performance.now() - t0;
-      setProcessingMs(ms);
-      setResult(data);
-      setTimeSeries((p) => [...p.slice(-9), +(ms / 1000).toFixed(2)]);
-      setStats((s) => ({ totalAnalyses: s.totalAnalyses + 1, imagesProcessed: s.imagesProcessed + 1 }));
+    // AbortController for timeout
+    const controller = new AbortController();
+    const timeoutId  = setTimeout(() => controller.abort(), PREDICT_TIMEOUT_MS);
 
-      const label = buildLabel(data);
-      setSessionHistory((h) =>
-        [{ id: Date.now(), url, label, category: data.category, secs: +(ms/1000).toFixed(2) }]
-          .concat(h).slice(0, 50)
-      );
-    } catch {
-      setResult({ category: "error", message: "Could not reach the backend." });
+    try {
+      const res  = await fetch(`${API_BASE}/api/predict`, {
+        method: "POST",
+        body: fd,
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+      const data = await res.json();
+      if (!res.ok) {
+        setResult({ category: "error", message: data?.detail || `Server error ${res.status}` });
+      } else {
+        const ms = performance.now() - t0;
+        setProcessingMs(ms);
+        setResult(data);
+        setTimeSeries((p) => [...p.slice(-9), +(ms / 1000).toFixed(2)]);
+        setStats((s) => ({ totalAnalyses: s.totalAnalyses + 1, imagesProcessed: s.imagesProcessed + 1 }));
+
+        const label = buildLabel(data);
+        setSessionHistory((h) =>
+          [{ id: Date.now(), url, label, category: data.category, secs: +(ms/1000).toFixed(2) }]
+            .concat(h).slice(0, 50)
+        );
+      }
+    } catch (err) {
+      clearTimeout(timeoutId);
+      if (err.name === "AbortError") {
+        setResult({ category: "error", message: "Request timed out — the image may have too many faces for CPU processing." });
+      } else {
+        setResult({ category: "error", message: "Could not reach the backend." });
+      }
     } finally {
       setLoading(false);
     }

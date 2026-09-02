@@ -23,6 +23,15 @@ export default function UploadZone({ previewUrl, loading, result, onFile, highli
   const imgRef    = useRef(null);     // holds the loaded HTMLImageElement
   const [dragging, setDragging] = useState(false);
 
+  // Elapsed time counter shown during loading
+  const [elapsed, setElapsed] = useState(0);
+  useEffect(() => {
+    if (!loading) { setElapsed(0); return; }
+    setElapsed(0);
+    const t = setInterval(() => setElapsed((s) => s + 1), 1000);
+    return () => clearInterval(t);
+  }, [loading]);
+
   const handleDrop = useCallback(
     (e) => {
       e.preventDefault();
@@ -200,6 +209,23 @@ export default function UploadZone({ previewUrl, loading, result, onFile, highli
               >
                 <div className="w-10 h-10 rounded-full border-2 border-accent-purple border-t-transparent animate-spin" />
                 <p className="text-sm text-slate-300 font-medium">Analyzing image…</p>
+                {/* Elapsed timer */}
+                <div className="flex items-center gap-1.5 text-xs text-slate-400 font-mono">
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+                  </svg>
+                  {elapsed}s elapsed
+                </div>
+                {elapsed >= 8 && (
+                  <motion.p
+                    initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }}
+                    className="text-[11px] text-slate-500 px-4 text-center leading-snug max-w-[200px]"
+                  >
+                    {elapsed >= 30
+                      ? "Large group detected — processing top 10 faces…"
+                      : "Running 3 AI models — CPU may take a moment"}
+                  </motion.p>
+                )}
               </motion.div>
             )}
           </AnimatePresence>

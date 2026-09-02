@@ -1,8 +1,10 @@
-# Divya Chakshu 2.0 — AI Image Recognition
+# VisionIQ — AI Image Recognition
 
-> **"The Divine Eye that Sees, Analyzes, and Understands"**
+> **AI-powered vision that sees, analyzes, and understands.**
 
-A full-stack deep learning web application that detects and classifies **Male**, **Female**, and **Animals** in uploaded images using an ensemble of pretrained models. Built with FastAPI (Python) + React (Vite + Tailwind CSS).
+A full-stack deep learning web application that detects and classifies **Male**, **Female**, and **Animals** in uploaded images using an ensemble of pretrained models.
+
+**Stack:** FastAPI (Python) + React (Vite + Tailwind CSS)
 
 ---
 
@@ -10,10 +12,10 @@ A full-stack deep learning web application that detects and classifies **Male**,
 
 | Item | Detail |
 |------|--------|
-| **Project Name** | Divya Chakshu 2.0 |
+| **Project Name** | VisionIQ |
 | **Type** | Deep Learning · Computer Vision · Full-Stack Web App |
 | **Models Used** | MTCNN · ViT · SigLIP2 · ResNet50 |
-| **Backend** | Python 3.14 · FastAPI · SQLite |
+| **Backend** | Python 3.11 · FastAPI · SQLite |
 | **Frontend** | React 18 · Vite · Tailwind CSS · Framer Motion |
 | **Detection** | Male · Female · Animal · Unknown |
 
@@ -22,12 +24,12 @@ A full-stack deep learning web application that detects and classifies **Male**,
 ## Project Structure
 
 ```
-divya-chakshu/
+VisionIQ/
 ├── backend/
 │   ├── app.py              # FastAPI server + SQLite history
 │   ├── pipeline.py         # ML inference engine (ensemble)
 │   ├── requirements.txt    # Python dependencies
-│   ├── install.bat         # One-click dependency installer
+│   ├── install.bat         # One-click dependency installer (Windows)
 │   └── history.db          # Auto-created SQLite database
 │
 ├── frontend/
@@ -40,143 +42,199 @@ divya-chakshu/
 │   │   ├── index.css       # CSS variables (light + dark)
 │   │   ├── components/
 │   │   │   ├── Sidebar.jsx
-│   │   │   ├── UploadZone.jsx       # Canvas + face box overlay
-│   │   │   ├── ResultsPanel.jsx     # Detection results
+│   │   │   ├── UploadZone.jsx
+│   │   │   ├── ResultsPanel.jsx
 │   │   │   ├── ModelStatusCard.jsx
-│   │   │   ├── ConfidenceChart.jsx  # Donut chart
+│   │   │   ├── ConfidenceChart.jsx
 │   │   │   ├── ProcessingTimeChart.jsx
 │   │   │   └── TopCategories.jsx
 │   │   └── pages/
-│   │       ├── DashboardPage.jsx    # Upload + live stats
-│   │       ├── HistoryPage.jsx      # DB-backed history
-│   │       └── ModelStatusPage.jsx  # Model metrics
+│   │       ├── DashboardPage.jsx
+│   │       ├── HistoryPage.jsx
+│   │       └── ModelStatusPage.jsx
 │   ├── index.html
+│   ├── package.json
 │   ├── tailwind.config.js
 │   └── vite.config.js
 │
+├── render.yaml             # Render deployment config (backend)
+├── vercel.json             # Vercel deployment config (frontend)
 └── README.md
 ```
 
 ---
 
-## Setup & Installation
+## Local Development
 
 ### Prerequisites
 
-- Python 3.12+ (tested on 3.14)
+- Python 3.12+
 - Node.js 18+
 - npm 9+
 - Internet connection (first run downloads model weights ~2 GB)
 
----
-
-### Backend Setup
+### Backend
 
 ```bash
-
 cd backend
 
+# Windows one-click:
 install.bat
 
-# OR manually:
-pip install "fastapi==0.115.0" "uvicorn[standard]==0.30.6" "python-multipart==0.0.9" "pillow>=10.4.0" "numpy>=2.3" "torch>=2.5" "torchvision>=0.20" "transformers>=4.45"
+# Or manually:
+pip install -r requirements.txt
 pip install "facenet-pytorch==2.6.0" --no-deps
 
-# 3. Start the server
 python app.py
+# → http://localhost:8000
+# → http://localhost:8000/docs  (Swagger UI)
 ```
 
-Server runs at: **http://localhost:8000**
-API End-Point : **http://localhost:8000/docs**
-
-> **First start is slow** — HuggingFace downloads ~2 GB of model weights. Subsequent starts are fast (weights cached locally).
-
----
-
-### Frontend Setup
+### Frontend
 
 ```bash
 cd frontend
 npm install
 npm run dev
+# → http://localhost:5173
 ```
 
-Frontend runs at: **http://localhost:5173**
+The frontend proxies `/api/*` to `http://localhost:8000` automatically via Vite config.
 
-> The frontend proxies `/api/*` requests to `http://localhost:8000` automatically via Vite config.
+### Quick Start
+
+```
+Terminal 1:  cd backend   →  python app.py
+Terminal 2:  cd frontend  →  npm run dev
+Browser:     http://localhost:5173
+```
 
 ---
 
-### Quick Start Summary
+## Free Deployment (Vercel + Render)
+
+Deploy the backend on **Render** (free tier) and the frontend on **Vercel** (free tier) — both are 100% free, no credit card needed.
 
 ```
-Terminal 1:   cd backend   →  python app.py
-Terminal 2:   cd frontend  →  npm run dev
-Browser:      http://localhost:5173
+Internet → Vercel (React frontend) → Render (FastAPI backend)
 ```
+
+---
+
+### Step 1 — Deploy Backend on Render
+
+1. Push your project to a GitHub repository.
+
+2. Go to [render.com](https://render.com) → **New → Web Service**.
+
+3. Connect your GitHub repo. Render auto-detects `render.yaml` — it will pre-fill all settings:
+   - **Root Directory:** `backend`
+   - **Build Command:** `pip install -r requirements.txt && pip install "facenet-pytorch==2.6.0" --no-deps`
+   - **Start Command:** `uvicorn app:app --host 0.0.0.0 --port $PORT`
+   - **Plan:** Free
+
+4. Click **Create Web Service**. Wait for the build to finish (5–10 min on first deploy — it downloads ~2 GB of model weights).
+
+5. Your backend URL will look like:
+   ```
+   https://visioniq-backend.onrender.com
+   ```
+   Copy this URL — you'll need it in Step 2.
+
+> **Free tier note:** Render free services spin down after 15 minutes of inactivity. The first request after a cold start takes ~30–60 seconds while models reload. Subsequent requests are fast.
+
+---
+
+### Step 2 — Configure Frontend for Production
+
+Open `vercel.json` and replace the placeholder with your actual Render backend URL:
+
+```json
+{
+  "rewrites": [
+    { "source": "/api/:path*", "destination": "https://visioniq-backend.onrender.com/api/:path*" }
+  ]
+}
+```
+
+This tells Vercel to forward all `/api/*` calls to your Render backend — no CORS issues.
+
+---
+
+### Step 3 — Deploy Frontend on Vercel
+
+1. Go to [vercel.com](https://vercel.com) → **Add New → Project**.
+
+2. Import your GitHub repository.
+
+3. Set the **Root Directory** to `frontend`.
+
+4. Vercel auto-detects Vite and applies the correct build settings:
+   - **Framework:** Vite
+   - **Build Command:** `npm run build`
+   - **Output Directory:** `dist`
+
+5. Click **Deploy**. Your frontend will be live at:
+   ```
+   https://visioniq.vercel.app
+   ```
+
+---
+
+### Step 4 — Verify
+
+| Check | URL |
+|-------|-----|
+| Frontend | `https://your-app.vercel.app` |
+| Backend health | `https://visioniq-backend.onrender.com/api/health` |
+| Backend API docs | `https://visioniq-backend.onrender.com/docs` |
+
+If the health check returns `"models_loaded": true`, everything is working.
+
+---
+
+### Deployment Summary
+
+| Service | Platform | Plan | Cost |
+|---------|----------|------|------|
+| React frontend | Vercel | Hobby (free) | $0 |
+| FastAPI backend | Render | Free | $0 |
 
 ---
 
 ## API Endpoints
 
-### `GET /`
-Returns app info and links.
+Base URL (local): `http://localhost:8000`
 
-### `GET /api/health`
-Check model loading status and device.
-
-### `POST /api/predict`
-Upload an image for classification.
-
-### `GET /api/history?limit=100`
-Retrieve all saved analyses from the database.
-
-### `DELETE /api/history`
-Clear all history entries.
-
-### `DELETE /api/history/{id}`
-Delete a single history entry by ID.
-
-
-### Interactive API Docs
-
-FastAPI auto-generates interactive documentation:
-- **Swagger UI:** http://localhost:8000/docs
-- **ReDoc:** http://localhost:8000/redoc
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/api/health` | Model load status + device |
+| `POST` | `/api/predict` | Upload image → classification |
+| `GET` | `/api/history` | Saved analyses (newest first) |
+| `DELETE` | `/api/history` | Clear all history |
+| `DELETE` | `/api/history/{id}` | Delete single entry |
 
 ---
 
 ## ML Model Architecture
 
-### Inference Pipeline
-
 ```
 Input Image
     │
     ▼
-MTCNN Face Detector  ──── Face detected? ────────────────────────┐
-    │                                                             │
-    │ Yes                                                         │ No
-    ▼                                                             ▼
-Face Crop (+ body context)                               ResNet50 ImageNet
-    │                                                             │
-    ▼                                                       Animal index?
-ViT Gender Classifier (Primary)                               │       │
-    +                                                       Yes      No
-SigLIP2 Gender Classifier (Secondary)                        │       │
-    │                                                        ▼       ▼
-Ensemble Average                                          Animal  Unknown
+MTCNN Face Detector
     │
-    ▼
-Male / Female Result
+    ├── Face found? ─── YES ──► ViT + SigLIP2 Ensemble ──► Male / Female
+    │
+    └── No face ──► ResNet50 ImageNet
+                        │
+                        ├── class idx ≤ 397 ──► Animal
+                        └── otherwise ────────► Unknown
 ```
 
-### Models Used
-
-| Model | Purpose | Source | Accuracy |
-|-------|---------|--------|----------|
-| **MTCNN** | Face bounding box detection | facenet-pytorch | ~94% precision |
-| **ViT (rizvandwiki)** | Gender classification (primary) | Hugging Face | ~91% |
-| **SigLIP2 (prithivMLmods)** | Gender classification (secondary) | Hugging Face | ~93% |
-| **ResNet50 IMAGENET1K_V2** | Animal/object fallback | torchvision | 80.3% top-1 |
-
+| Model | Purpose | Accuracy |
+|-------|---------|----------|
+| MTCNN | Face detection | ~94% precision |
+| ViT (rizvandwiki) | Gender — primary | ~91% |
+| SigLIP2 (prithivMLmods) | Gender — secondary | ~93% |
+| ResNet50 IMAGENET1K_V2 | Animal/object fallback | 80.3% top-1 |

@@ -35,11 +35,11 @@ export default function Sidebar({ active, onNav, health }) {
         className="flex items-center gap-3 px-5 py-5 border-b border-border-subtle"
       >
         <div className="w-10 h-10 rounded-xl overflow-hidden shrink-0 shadow-glow">
-          <img src="/icon.png" alt="Divya Chakshu" className="w-full h-full object-cover" />
+          <img src="/icon.png" alt="VisionIQ" className="w-full h-full object-cover" />
         </div>
         <div className="leading-tight min-w-0">
-          <p className="text-sm font-bold text-tx-primary tracking-wide truncate">Divya Chakshu</p>
-          <p className="text-[10px] text-accent-purple font-mono font-semibold">2.0</p>
+          <p className="text-sm font-bold text-tx-primary tracking-wide truncate">VisionIQ</p>
+          <p className="text-[10px] text-accent-purple font-mono font-semibold">AI Vision</p>
         </div>
       </motion.div>
 
