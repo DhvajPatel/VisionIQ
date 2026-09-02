@@ -10,7 +10,7 @@ Endpoints:
 import base64, io, json, logging, sqlite3, time
 from pathlib import Path
 
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi import FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from PIL import Image
 
@@ -89,12 +89,14 @@ def image_to_b64(image: Image.Image, max_w=400) -> str:
 
 # ── routes ────────────────────────────────────────────────────────────────────
 @app.get("/")
-def root():
+def root(request: Request):
+    base = str(request.base_url).rstrip("/")
     return {
         "app": "VisionIQ",
         "status": "running",
-        "frontend": "http://localhost:5173",
-        "docs": "http://localhost:8000/docs",
+        "frontend": "https://visioniq-zeta.vercel.app",
+        "docs": f"{base}/docs",
+        "health": f"{base}/api/health",
     }
 
 
