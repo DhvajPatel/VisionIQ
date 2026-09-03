@@ -56,12 +56,12 @@ app.add_middleware(
 engine = None
 load_error = None
 try:
-    logger.info("Initialising engine (models load lazily on first request)…")
+    logger.info("Loading models (float16 mode)…")
     engine = DivyaChakshuEngine()
-    logger.info("Engine ready — models will load on first /api/predict call.")
+    logger.info("All models ready.")
 except Exception as exc:
     load_error = str(exc)
-    logger.exception("Failed to initialise engine")
+    logger.exception("Failed to load models")
 
 
 # ── helpers ───────────────────────────────────────────────────────────────────

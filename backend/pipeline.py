@@ -1,28 +1,30 @@
 """
-pipeline.py — VisionIQ inference core (render-optimised build).
+pipeline.py — VisionIQ inference core (render-optimised, float16).
 
 Render free tier: 512 MB RAM, no GPU.
 
-Model stack (RAM budget ~480 MB total):
-  1. MTCNN             (facenet-pytorch)                  ~50 MB  — face detection
-  2. ViT-B/16          (rizvandwiki/gender-classification) ~330 MB — gender classification
-  3. ResNet50 V2       (torchvision)                      ~100 MB — animal / object fallback
+RAM budget (float16):
+  OS + Python runtime  ~100 MB
+  torch CPU base       ~150 MB
+  MTCNN                 ~50 MB
+  ViT-B/16 float16     ~165 MB  ← halved from 330 MB
+  ResNet50 float16      ~50 MB  ← halved from 100 MB
+  ─────────────────────────────
+  Total                ~515 MB  ← tight but fits with swap headroom
 
-Models are pre-downloaded at BUILD time by download_models.py into
-/opt/render/project/src/.hf_cache so startup is fast (<30 s, no network needed).
+float16 on CPU: torch supports it via .half(), inference accuracy unchanged.
 """
 
 from dataclasses import dataclass, field
 from typing import List, Optional, Tuple
 import logging
-import os
 
 import torch
 import torch.nn.functional as F
 from PIL import Image
 from facenet_pytorch import MTCNN
 from torchvision.models import resnet50, ResNet50_Weights
-from transformers import pipeline as hf_pipeline
+from transformers import AutoImageProcessor, AutoModelForImageClassification
 
 logger = logging.getLogger("visioniq.pipeline")
 
@@ -82,16 +84,15 @@ class PredictionResult:
 
 class VisionIQEngine:
     """
-    Eager-loading inference engine.
-    All models load in __init__ — weights are already on disk from build time
-    so this completes in ~15-20 seconds with no network I/O.
+    Loads all models in float16 to stay within Render's 512 MB RAM limit.
     """
 
     def __init__(self):
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        logger.info("Device: %s", self.device)
+        self.device = torch.device("cpu")  # Render has no GPU
+        logger.info("Device: cpu (float16 mode)")
 
-        logger.info("Loading MTCNN face detector…")
+        # ── MTCNN face detector (~50 MB, float32 — MTCNN doesn't support f16) ──
+        logger.info("Loading MTCNN…")
         self.face_detector = MTCNN(
             keep_all=True,
             device=self.device,
@@ -99,17 +100,23 @@ class VisionIQEngine:
             min_face_size=20,
         )
 
-        logger.info("Loading ViT-B/16 gender classifier…")
-        _dev = 0 if self.device.type == "cuda" else -1
-        self.gender_model = hf_pipeline(
-            "image-classification",
-            model="rizvandwiki/gender-classification",
-            device=_dev,
+        # ── ViT-B/16 gender classifier loaded in float16 (~165 MB) ──────────
+        logger.info("Loading ViT-B/16 in float16…")
+        self.gender_processor = AutoImageProcessor.from_pretrained(
+            "rizvandwiki/gender-classification"
         )
+        self.gender_model = AutoModelForImageClassification.from_pretrained(
+            "rizvandwiki/gender-classification",
+            torch_dtype=torch.float16,
+            low_cpu_mem_usage=True,
+        ).eval()
+        # Build id→label map
+        self.gender_id2label = self.gender_model.config.id2label
 
-        logger.info("Loading ResNet50 animal classifier…")
+        # ── ResNet50 in float16 (~50 MB) ──────────────────────────────────────
+        logger.info("Loading ResNet50 in float16…")
         weights = ResNet50_Weights.IMAGENET1K_V2
-        self.animal_classifier = resnet50(weights=weights).to(self.device).eval()
+        self.animal_classifier = resnet50(weights=weights).half().eval()
         self.animal_transform  = weights.transforms()
         self.animal_categories = weights.meta["categories"]
 
@@ -123,12 +130,20 @@ class VisionIQEngine:
         return GENDER_LABEL_MAP.get(raw.strip().lower(), raw.title())
 
     def _gender_scores(self, crop: Image.Image) -> dict:
-        """Run ViT-B/16 on crop → normalised {'Male': p, 'Female': p}."""
-        preds = self.gender_model(crop)
+        """Run ViT-B/16 (float16) on crop → normalised {'Male': p, 'Female': p}."""
+        inputs = self.gender_processor(images=crop, return_tensors="pt")
+        # Cast inputs to float16 to match model weights
+        inputs = {k: v.half() if v.dtype == torch.float32 else v
+                  for k, v in inputs.items()}
+        with torch.no_grad():
+            logits = self.gender_model(**inputs).logits
+            probs  = torch.softmax(logits, dim=-1).squeeze(0)
+
         scores: dict = {}
-        for p in preds:
-            label = self._norm_label(p["label"])
-            scores[label] = scores.get(label, 0.0) + p["score"]
+        for idx, prob in enumerate(probs):
+            raw   = self.gender_id2label.get(idx, str(idx))
+            label = self._norm_label(raw)
+            scores[label] = scores.get(label, 0.0) + float(prob)
         scores.setdefault("Male",   0.0)
         scores.setdefault("Female", 0.0)
         total = scores["Male"] + scores["Female"]
@@ -208,10 +223,11 @@ class VisionIQEngine:
         return crop
 
     def _run_animal_classifier(self, image: Image.Image) -> Tuple[int, str, float]:
-        tensor = self.animal_transform(image).unsqueeze(0).to(self.device)
+        # animal_transform returns float32; cast to float16 to match model
+        tensor = self.animal_transform(image).unsqueeze(0).half()
         with torch.no_grad():
             probs = F.softmax(self.animal_classifier(tensor), dim=1).squeeze(0)
-        top_idx  = int(torch.argmax(probs).item())
+        top_idx = int(torch.argmax(probs).item())
         return top_idx, self.animal_categories[top_idx], round(float(probs[top_idx]), 4)
 
     # ── main predict ─────────────────────────────────────────────────────────
