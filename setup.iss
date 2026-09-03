@@ -20,7 +20,7 @@
 #define MyAppExeName   "VisionIQ.exe"
 #define MyAppId        "{{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}"
 
-; Path to electron-builder's unpacked output (change if different)
+; Path to electron-builder's unpacked output
 #define UnpackedDir    "dist-electron\win-unpacked"
 
 [Setup]
@@ -34,18 +34,16 @@ AppUpdatesURL={#MyAppURL}
 DefaultDirName={autopf}\{#MyAppName}
 DefaultGroupName={#MyAppName}
 AllowNoIcons=yes
-; Require admin — needed to write to Program Files
 PrivilegesRequired=admin
 OutputDir=installer
 OutputBaseFilename=VisionIQ_Setup_{#MyAppVersion}
-SetupIconFile=frontend\public\icon.png
+; MUST be .ico for Inno Setup
+SetupIconFile=frontend\public\icon.ico
 Compression=lzma2/ultra64
 SolidCompression=yes
 WizardStyle=modern
 WizardSizePercent=120
-; Show license if it exists
 LicenseFile=LICENSE.txt
-; Minimum Windows 10
 MinVersion=10.0
 ArchitecturesAllowed=x64
 ArchitecturesInstallIn64BitMode=x64
@@ -54,49 +52,42 @@ ArchitecturesInstallIn64BitMode=x64
 Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Tasks]
-Name: "desktopicon";    Description: "{cm:CreateDesktopIcon}";     GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
-Name: "quicklaunchicon"; Description: "{cm:CreateQuickLaunchIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked; OnlyBelowVersion: 6.1; Check: not IsAdminInstallMode
+Name: "desktopicon";     Description: "{cm:CreateDesktopIcon}";      GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
+Name: "quicklaunchicon"; Description: "{cm:CreateQuickLaunchIcon}";  GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked; OnlyBelowVersion: 6.1; Check: not IsAdminInstallMode
 
 [Files]
-; ── All Electron app files (from electron-builder unpacked output) ──
+; All Electron app files
 Source: "{#UnpackedDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
-; ── App icon separately (for shortcuts) ──
-Source: "frontend\public\icon.png"; DestDir: "{app}"; Flags: ignoreversion
+; App icon (for shortcuts) — .ico required for Windows shortcuts
+Source: "frontend\public\icon.ico"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
 ; Start Menu
-Name: "{group}\{#MyAppName}";            Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\icon.png"
-Name: "{group}\Uninstall {#MyAppName}";  Filename: "{uninstallexe}"
+Name: "{group}\{#MyAppName}";           Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\icon.ico"
+Name: "{group}\Uninstall {#MyAppName}"; Filename: "{uninstallexe}"
 
-; Desktop shortcut (optional)
-Name: "{autodesktop}\{#MyAppName}";      Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\icon.png"; Tasks: desktopicon
+; Desktop shortcut (optional, user-selected)
+Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\icon.ico"; Tasks: desktopicon
 
-; Quick Launch (Windows XP/Vista only)
+; Quick Launch (legacy Windows)
 Name: "{userappdata}\Microsoft\Internet Explorer\Quick Launch\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: quicklaunchicon
 
 [Run]
-; Launch app after install
+; Launch app after install finishes
 Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent
 
 [UninstallDelete]
-; Clean up model cache and history database on uninstall
+; Clean up generated files on uninstall
 Type: filesandordirs; Name: "{app}\resources\backend\_internal\.hf_cache"
 Type: filesandordirs; Name: "{app}\resources\backend\history.db"
 
 [Code]
-// Show a message if Visual C++ Redistributable might be needed
-procedure InitializeWizard();
-begin
-  // Nothing extra needed — Electron ships its own runtime
-end;
-
 function InitializeSetup(): Boolean;
 begin
   Result := True;
-  // Warn if running 32-bit Windows
   if not Is64BitInstallMode then begin
-    MsgBox('VisionIQ requires a 64-bit version of Windows.', mbError, MB_OK);
+    MsgBox('VisionIQ requires a 64-bit version of Windows 10 or later.', mbError, MB_OK);
     Result := False;
   end;
 end;

@@ -86,7 +86,7 @@ function createMainWindow() {
     minHeight: 600,
     show: false,
     title: "VisionIQ — AI Vision",
-    icon: path.join(__dirname, "..", "frontend", "public", "icon.png"),
+    icon: path.join(__dirname, "..", "frontend", "public", "icon.ico"),
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       nodeIntegration: false,

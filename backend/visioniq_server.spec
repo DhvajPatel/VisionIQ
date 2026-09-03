@@ -117,7 +117,7 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon="../frontend/public/icon.png",
+    icon="../frontend/public/icon.ico",
 )
 
 coll = COLLECT(
