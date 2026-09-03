@@ -102,11 +102,10 @@ def root(request: Request):
 
 @app.get("/api/health")
 def health():
-    loaded = engine is not None and engine._loaded
+    loaded = engine is not None and getattr(engine, "_loaded", False)
     return {
         "status":        "ok" if engine else "error",
         "models_loaded": loaded,
-        "loading":       engine is not None and not engine._loaded,
         "error":         load_error,
         "device":        str(engine.device) if engine else None,
     }

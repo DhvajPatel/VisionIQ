@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useRef } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useTheme } from "./ThemeContext.jsx";
 import Sidebar from "./components/Sidebar.jsx";
@@ -9,57 +9,53 @@ import ModelStatusPage from "./pages/ModelStatusPage.jsx";
 const API_BASE = "";
 
 const PAGE_TITLES = {
-  dashboard:    { title: "Image Recognition Dashboard", sub: "Detects: Male · Female · Animal" },
-  upload:       { title: "Upload Image",                sub: "Drag & drop or click to select" },
-  history:      { title: "Recent Analyses",             sub: "All your saved predictions" },
-  "model-status": { title: "Model Status",              sub: "Performance metrics & architecture" },
+  dashboard:      { sub: "Detects: Male · Female · Animal" },
+  upload:         { sub: "Drag & drop or click to select" },
+  history:        { sub: "All your saved predictions" },
+  "model-status": { sub: "Performance metrics & architecture" },
 };
 
 export default function App() {
   const { theme, toggle } = useTheme();
-  const [health, setHealth]         = useState(null);
-  const [page, setPage]             = useState("dashboard");
+  const [health, setHealth]             = useState(null);
+  const [page, setPage]                 = useState("dashboard");
+  const [sidebarOpen, setSidebarOpen]   = useState(false);
 
-  // prediction
-  const [previewUrl, setPreviewUrl] = useState(null);
-  const [loading, setLoading]       = useState(false);
-  const [result, setResult]         = useState(null);
-  const [processingMs, setProcessingMs] = useState(null);
+  // prediction state
+  const [previewUrl, setPreviewUrl]         = useState(null);
+  const [loading, setLoading]               = useState(false);
+  const [result, setResult]                 = useState(null);
+  const [processingMs, setProcessingMs]     = useState(null);
   const [highlightIndex, setHighlightIndex] = useState(null);
 
-  // history (in-memory for current session + DB-backed)
   const [sessionHistory, setSessionHistory] = useState([]);
+  const [timeSeries, setTimeSeries]         = useState([0,0,0,0,0,0,0,0,0,0]);
+  const [stats, setStats]                   = useState({ totalAnalyses: 0, imagesProcessed: 0 });
 
-  // time series
-  const [timeSeries, setTimeSeries] = useState([0,0,0,0,0,0,0,0,0,0]);
-
-  // session stats
-  const [stats, setStats] = useState({ totalAnalyses: 0, imagesProcessed: 0 });
-
-  // Poll health every 5 s until models are loaded, then every 30 s
+  // ── health polling ────────────────────────────────────────────────────────
   useEffect(() => {
     let timer;
     const checkHealth = () => {
-      fetch(`${API_BASE}/api/health`)
-        .then((r) => r.json())
+      const controller = new AbortController();
+      const tId = setTimeout(() => controller.abort(), 60000);
+      fetch(`${API_BASE}/api/health`, { signal: controller.signal })
+        .then((r) => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
         .then((data) => {
+          clearTimeout(tId);
           setHealth(data);
-          // Keep polling every 5 s while models are still loading
           timer = setTimeout(checkHealth, data.models_loaded ? 30000 : 5000);
         })
         .catch(() => {
-          setHealth((prev) => prev === null ? { status: "unreachable", models_loaded: false } : prev);
-          // Retry every 5 s when backend is unreachable
-          timer = setTimeout(checkHealth, 5000);
+          clearTimeout(tId);
+          setHealth((prev) => prev ?? { status: "unreachable", models_loaded: false });
+          timer = setTimeout(checkHealth, 8000);
         });
     };
     checkHealth();
     return () => clearTimeout(timer);
   }, []);
 
-  // prediction timeout (ms) — 3 min for large group images on CPU
-  const PREDICT_TIMEOUT_MS = 180_000;
-
+  // ── predict ───────────────────────────────────────────────────────────────
   const handleFile = useCallback(async (file) => {
     if (!file) return;
     const url = URL.createObjectURL(file);
@@ -68,21 +64,16 @@ export default function App() {
     setLoading(true);
     setHighlightIndex(null);
     setPage("dashboard");
+    setSidebarOpen(false);
 
     const fd = new FormData();
     fd.append("file", file);
     const t0 = performance.now();
-
-    // AbortController for timeout
     const controller = new AbortController();
-    const timeoutId  = setTimeout(() => controller.abort(), PREDICT_TIMEOUT_MS);
+    const timeoutId  = setTimeout(() => controller.abort(), 180_000);
 
     try {
-      const res  = await fetch(`${API_BASE}/api/predict`, {
-        method: "POST",
-        body: fd,
-        signal: controller.signal,
-      });
+      const res  = await fetch(`${API_BASE}/api/predict`, { method: "POST", body: fd, signal: controller.signal });
       clearTimeout(timeoutId);
       const data = await res.json();
       if (!res.ok) {
@@ -93,7 +84,6 @@ export default function App() {
         setResult(data);
         setTimeSeries((p) => [...p.slice(-9), +(ms / 1000).toFixed(2)]);
         setStats((s) => ({ totalAnalyses: s.totalAnalyses + 1, imagesProcessed: s.imagesProcessed + 1 }));
-
         const label = buildLabel(data);
         setSessionHistory((h) =>
           [{ id: Date.now(), url, label, category: data.category, secs: +(ms/1000).toFixed(2) }]
@@ -102,11 +92,12 @@ export default function App() {
       }
     } catch (err) {
       clearTimeout(timeoutId);
-      if (err.name === "AbortError") {
-        setResult({ category: "error", message: "Request timed out — the image may have too many faces for CPU processing." });
-      } else {
-        setResult({ category: "error", message: "Could not reach the backend." });
-      }
+      setResult({
+        category: "error",
+        message: err.name === "AbortError"
+          ? "Request timed out — too many faces for CPU processing."
+          : "Could not reach the backend.",
+      });
     } finally {
       setLoading(false);
     }
@@ -120,41 +111,69 @@ export default function App() {
   };
 
   const handleNav = (id) => {
-    setPage(id);
-    if (id === "upload") {
-      setPage("dashboard");
-      handleClear();
-    }
+    setPage(id === "upload" ? "dashboard" : id);
+    if (id === "upload") handleClear();
+    setSidebarOpen(false);
   };
 
   const pageInfo = PAGE_TITLES[page] || PAGE_TITLES.dashboard;
 
   return (
     <div className="flex h-screen overflow-hidden bg-bg-primary text-tx-primary transition-colors duration-300">
-      <Sidebar active={page} onNav={handleNav} health={health} />
 
-      <div className="flex-1 flex flex-col overflow-hidden">
-        {/* ── Header ── */}
-        <header className="flex items-center justify-between px-6 py-3 border-b border-border-subtle bg-bg-secondary/70 backdrop-blur-md shrink-0 transition-colors duration-300">
+      {/* ── Mobile sidebar backdrop ── */}
+      <AnimatePresence>
+        {sidebarOpen && (
           <motion.div
-            key={page}
-            initial={{ opacity: 0, x: -8 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.2 }}
-          >
-            <div className="flex items-center gap-2">
-              <h2 className="text-base font-bold text-tx-primary leading-tight">
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-30 bg-black/60 md:hidden"
+            onClick={() => setSidebarOpen(false)}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* ── Sidebar — hidden on mobile unless open ── */}
+      <div className={`
+        fixed inset-y-0 left-0 z-40 md:static md:z-auto md:flex md:flex-col
+        transform transition-transform duration-300 ease-in-out
+        ${sidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}
+      `}>
+        <Sidebar active={page} onNav={handleNav} health={health} onClose={() => setSidebarOpen(false)} />
+      </div>
+
+      {/* ── Main content ── */}
+      <div className="flex-1 flex flex-col overflow-hidden min-w-0">
+
+        {/* ── Header ── */}
+        <header className="flex items-center justify-between px-4 md:px-6 py-3 border-b border-border-subtle bg-bg-secondary/70 backdrop-blur-md shrink-0 transition-colors duration-300">
+          <div className="flex items-center gap-3 min-w-0">
+            {/* Hamburger — mobile only */}
+            <button
+              className="md:hidden p-2 rounded-xl border border-border-card text-tx-secondary hover:bg-bg-hover transition"
+              onClick={() => setSidebarOpen(true)}
+              aria-label="Open menu"
+            >
+              <HamburgerIcon />
+            </button>
+
+            <motion.div
+              key={page}
+              initial={{ opacity: 0, x: -8 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.2 }}
+              className="min-w-0"
+            >
+              <h2 className="text-sm md:text-base font-bold text-tx-primary leading-tight truncate">
                 Welcome back, AI Explorer! 👋
               </h2>
-            </div>
-            <p className="text-xs text-tx-muted">{pageInfo.sub}</p>
-          </motion.div>
+              <p className="text-xs text-tx-muted truncate">{pageInfo.sub}</p>
+            </motion.div>
+          </div>
 
-          <div className="flex items-center gap-3">
-            {/* Theme toggle button */}
+          <div className="flex items-center gap-2 shrink-0">
+            {/* Theme toggle */}
             <motion.button
-              whileHover={{ scale: 1.07 }}
-              whileTap={{ scale: 0.93 }}
+              whileHover={{ scale: 1.07 }} whileTap={{ scale: 0.93 }}
               onClick={toggle}
               className="p-2 rounded-xl border border-border-card text-tx-secondary hover:text-tx-primary hover:bg-bg-hover transition-all duration-200"
               title={theme === "dark" ? "Switch to Light Mode" : "Switch to Dark Mode"}
@@ -163,37 +182,29 @@ export default function App() {
             </motion.button>
 
             {/* Model status pill */}
-            <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs font-medium transition-all ${
+            <div className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-full border text-xs font-medium transition-all ${
               health?.models_loaded
                 ? "border-accent-green/40 text-accent-green bg-accent-green/10"
-                : health?.loading
-                  ? "border-amber-500/40 text-amber-400 bg-amber-500/10"
-                  : health === null
-                    ? "border-border-card text-tx-muted bg-bg-card"
-                    : "border-red-500/40 text-red-400 bg-red-500/10"
+                : health === null
+                  ? "border-border-card text-tx-muted bg-bg-card"
+                  : "border-red-500/40 text-red-400 bg-red-500/10"
             }`}>
-              <span className={`w-1.5 h-1.5 rounded-full ${
-                health?.models_loaded
-                  ? "bg-accent-green animate-pulse"
-                  : health?.loading
-                    ? "bg-amber-400 animate-pulse"
-                    : health === null
-                      ? "bg-slate-500"
-                      : "bg-red-400"
+              <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                health?.models_loaded ? "bg-accent-green animate-pulse"
+                  : health === null   ? "bg-slate-500"
+                  : "bg-red-400"
               }`} />
-              {health?.models_loaded
-                ? "Models Active"
-                : health?.loading
-                  ? "Loading models…"
-                  : health === null
-                    ? "Connecting…"
-                    : "Models Offline"}
+              <span className="hidden sm:inline">
+                {health?.models_loaded ? "Models Active"
+                  : health === null   ? "Connecting…"
+                  : "Offline"}
+              </span>
             </div>
           </div>
         </header>
 
         {/* ── Page content ── */}
-        <main className="flex-1 overflow-y-auto px-6 py-5">
+        <main className="flex-1 overflow-y-auto px-3 md:px-6 py-4 md:py-5">
           <AnimatePresence mode="wait">
             <motion.div
               key={page}
@@ -217,11 +228,7 @@ export default function App() {
                   onHoverFace={setHighlightIndex}
                 />
               )}
-
-              {page === "history" && (
-                <HistoryPage />
-              )}
-
+              {page === "history" && <HistoryPage />}
               {page === "model-status" && (
                 <ModelStatusPage
                   health={health}
@@ -251,6 +258,15 @@ function buildLabel(data) {
   return data.best_guess_label || "Unknown";
 }
 
+function HamburgerIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+      <line x1="3" y1="6"  x2="21" y2="6"/>
+      <line x1="3" y1="12" x2="21" y2="12"/>
+      <line x1="3" y1="18" x2="21" y2="18"/>
+    </svg>
+  );
+}
 function SunIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

@@ -96,7 +96,7 @@ export default function ModelStatusPage({ health, timeSeries, processingMs, resu
       </div>
 
       {/* Charts row */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-5">
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.4 }} className="lg:col-span-2">
           <ProcessingTimeChart timeSeries={timeSeries} latestMs={processingMs} expanded />
         </motion.div>

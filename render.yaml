@@ -4,28 +4,29 @@ services:
     runtime: python
     rootDir: backend
 
-    # Render free tier uses Python 3.11 by default — pin it explicitly
+    # Step 1: install deps
+    # Step 2: install facenet-pytorch without its stale Pillow constraint
+    # Step 3: pre-download all model weights into /tmp/hf_cache at BUILD time
+    #         so the server starts instantly with no OOM risk at runtime
     buildCommand: >
       pip install -r requirements.txt &&
-      pip install "facenet-pytorch==2.6.0" --no-deps
+      pip install "facenet-pytorch==2.6.0" --no-deps &&
+      python download_models.py
 
     startCommand: uvicorn app:app --host 0.0.0.0 --port $PORT
 
-    # Free tier: 512 MB RAM — models load lazily on first request
     plan: free
 
     envVars:
       - key: PYTHON_VERSION
         value: "3.11.9"
-      # Tell HuggingFace to cache models in a writable temp dir on Render
       - key: HF_HOME
-        value: /tmp/hf_cache
-      # Suppress symlink warnings from transformers on Linux
+        value: /opt/render/project/src/.hf_cache
       - key: TRANSFORMERS_CACHE
-        value: /tmp/hf_cache
-      # Disable HuggingFace telemetry
+        value: /opt/render/project/src/.hf_cache
+      - key: TORCH_HOME
+        value: /opt/render/project/src/.hf_cache
       - key: HF_HUB_DISABLE_TELEMETRY
         value: "1"
-      # Force CPU inference (Render free tier has no GPU)
       - key: CUDA_VISIBLE_DEVICES
         value: ""

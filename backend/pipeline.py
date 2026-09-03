@@ -3,16 +3,13 @@ pipeline.py — VisionIQ inference core (render-optimised build).
 
 Render free tier: 512 MB RAM, no GPU.
 
-Model stack (RAM budget ~420 MB total):
+Model stack (RAM budget ~480 MB total):
   1. MTCNN             (facenet-pytorch)                  ~50 MB  — face detection
   2. ViT-B/16          (rizvandwiki/gender-classification) ~330 MB — gender classification
   3. ResNet50 V2       (torchvision)                      ~100 MB — animal / object fallback
 
-ViT-L/16 (~1.2 GB) and SigLIP2-Mini (~900 MB) are excluded on Render to stay
-within 512 MB. The single ViT-B/16 model still achieves ~91% gender accuracy.
-
-Models are loaded lazily on the first /api/predict request so the process starts
-fast and Render's port-binding check passes before the ~2 min HuggingFace download.
+Models are pre-downloaded at BUILD time by download_models.py into
+/opt/render/project/src/.hf_cache so startup is fast (<30 s, no network needed).
 """
 
 from dataclasses import dataclass, field
@@ -61,11 +58,6 @@ GENDER_LABEL_MAP = {
     "0":      "Male",  "1":      "Female",
 }
 
-# ── detect render environment ─────────────────────────────────────────────────
-# On Render the HOME is /root and RENDER env var is set.
-IS_RENDER = os.environ.get("RENDER") == "true" or os.environ.get("HF_HOME", "").startswith("/tmp")
-
-
 # ── data classes ─────────────────────────────────────────────────────────────
 
 @dataclass
@@ -90,29 +82,14 @@ class PredictionResult:
 
 class VisionIQEngine:
     """
-    Lazy-loading inference engine.
-    Models are downloaded and loaded on the first call to predict(),
-    not at import time, so the server starts fast on Render.
+    Eager-loading inference engine.
+    All models load in __init__ — weights are already on disk from build time
+    so this completes in ~15-20 seconds with no network I/O.
     """
 
     def __init__(self):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         logger.info("Device: %s", self.device)
-        self._loaded = False
-
-        # placeholders — populated by _load_models()
-        self.face_detector    = None
-        self.gender_model     = None
-        self.animal_classifier = None
-        self.animal_transform  = None
-        self.animal_categories = None
-
-    # ── lazy loader ──────────────────────────────────────────────────────────
-
-    def _load_models(self):
-        """Download and initialise all models. Called once on first predict()."""
-        if self._loaded:
-            return
 
         logger.info("Loading MTCNN face detector…")
         self.face_detector = MTCNN(
@@ -240,9 +217,6 @@ class VisionIQEngine:
     # ── main predict ─────────────────────────────────────────────────────────
 
     def predict(self, image: Image.Image) -> PredictionResult:
-        # Load models on first call (lazy)
-        self._load_models()
-
         image = image.convert("RGB")
         boxes, probs = self.face_detector.detect(image)
 

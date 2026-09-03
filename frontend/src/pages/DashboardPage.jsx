@@ -28,26 +28,26 @@ export default function DashboardPage({
 
   return (
     <div className="space-y-5">
-      {/* Stat cards */}
-      <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+      {/* Stat cards — 2 cols on mobile, 4 on xl */}
+      <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 md:gap-4">
         {cards.map((c, i) => (
           <motion.div key={c.label} {...fade(i)}
-            className="bg-bg-card border border-border-card rounded-2xl p-4 flex items-center gap-4 hover:border-accent-purple/40 hover:shadow-glow-sm transition-all duration-300 group"
+            className="bg-bg-card border border-border-card rounded-2xl p-3 md:p-4 flex items-center gap-3 md:gap-4 hover:border-accent-purple/40 hover:shadow-glow-sm transition-all duration-300 group"
           >
-            <div className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 transition-transform duration-300 group-hover:scale-110 ${colorBg(c.color)}`}>
+            <div className={`w-9 h-9 md:w-11 md:h-11 rounded-xl flex items-center justify-center shrink-0 transition-transform duration-300 group-hover:scale-110 ${colorBg(c.color)}`}>
               {c.icon}
             </div>
             <div className="min-w-0">
-              <p className="text-[11px] text-tx-muted truncate">{c.label}</p>
-              <p className="text-xl font-bold text-tx-primary font-mono leading-tight">{c.value}</p>
+              <p className="text-[10px] md:text-[11px] text-tx-muted truncate">{c.label}</p>
+              <p className="text-lg md:text-xl font-bold text-tx-primary font-mono leading-tight">{c.value}</p>
               <p className="text-[10px] text-tx-muted truncate">{c.sub}</p>
             </div>
           </motion.div>
         ))}
       </div>
 
-      {/* Upload + model status */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+      {/* Upload + model status — stacked on mobile, side-by-side on lg */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-5">
         <motion.div {...fade(4)} className="lg:col-span-2 bg-bg-card rounded-2xl border border-border-card p-4 flex flex-col gap-3">
           <div className="flex items-center justify-between">
             <h3 className="font-semibold text-tx-primary">Image Analysis</h3>
@@ -73,8 +73,8 @@ export default function DashboardPage({
         </motion.div>
       </div>
 
-      {/* Results + charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+      {/* Results + charts — stacked on mobile, side-by-side on lg */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-5">
         <motion.div {...fade(6)} className="lg:col-span-2 bg-bg-card rounded-2xl border border-border-card p-4">
           {/* Category badge */}
           {result && result.category !== "error" && (

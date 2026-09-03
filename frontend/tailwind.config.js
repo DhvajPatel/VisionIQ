@@ -10,6 +10,10 @@ export default {
   ],
   theme: {
     extend: {
+      screens: {
+        xs: "480px",   // small phones
+        // md: 768px (Tailwind default) — tablet/desktop split
+      },
       colors: {
         bg: {
           primary:   "var(--bg-primary)",
