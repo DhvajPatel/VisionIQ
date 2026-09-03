@@ -4,11 +4,11 @@ services:
     runtime: python
     rootDir: backend
 
-    # Step 1: install deps
-    # Step 2: install facenet-pytorch without its stale Pillow constraint
-    # Step 3: pre-download all model weights into /tmp/hf_cache at BUILD time
-    #         so the server starts instantly with no OOM risk at runtime
+    # Render Python 3.11 — install CPU-only torch explicitly before requirements.txt
+    # so the flexible >= pins in requirements.txt resolve to the CPU wheel
     buildCommand: >
+      pip install --extra-index-url https://download.pytorch.org/whl/cpu
+      "torch==2.5.1+cpu" "torchvision==0.20.1+cpu" &&
       pip install -r requirements.txt &&
       pip install "facenet-pytorch==2.6.0" --no-deps &&
       python download_models.py

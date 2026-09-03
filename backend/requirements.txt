@@ -1,22 +1,21 @@
-fastapi==0.115.0
-uvicorn[standard]==0.30.6
-python-multipart==0.0.9
+# VisionIQ backend dependencies
+# ── Web framework ────────────────────────────────────────────────────────────
+fastapi>=0.115.0
+uvicorn[standard]>=0.30.0
+python-multipart>=0.0.9
 
+# ── Image & numerics ─────────────────────────────────────────────────────────
 pillow>=10.4.0
-numpy>=2.3
+numpy>=2.0
 
-# CPU-only torch — avoids downloading 1.5 GB of CUDA libs on Render's servers.
-# ~250 MB vs ~1.7 GB for the CUDA build. Render has no GPU anyway.
+# ── PyTorch CPU-only build ───────────────────────────────────────────────────
+# For Render (Linux): pinned CPU wheel from PyTorch CDN
+#   pip install -r requirements.txt --extra-index-url https://download.pytorch.org/whl/cpu
+# For local Windows (Python 3.14): use whatever torch is already installed
+#   torch 2.13+ is fine
 --extra-index-url https://download.pytorch.org/whl/cpu
-torch==2.5.1+cpu
-torchvision==0.20.1+cpu
+torch>=2.5.0
+torchvision>=0.20.0
 
-transformers>=4.45,<5.0.0
-
-# facenet-pytorch: installed without its stale Pillow constraint.
-# The build command in render.yaml runs two pip install steps to handle this.
-
-# HuggingFace gender models (auto-downloaded on first request, not at build time):
-#   1. rizvandwiki/gender-classification    (ViT-B/16, ~330 MB)
-#   2. rizvandwiki/gender-classification-2  (ViT-L/16, ~1.2 GB)
-#   3. prithivMLmods/Gender-Classifier-Mini (SigLIP2,  ~900 MB)
+# ── HuggingFace ──────────────────────────────────────────────────────────────
+transformers>=4.45.0
