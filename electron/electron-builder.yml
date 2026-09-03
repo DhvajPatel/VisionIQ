@@ -1,0 +1,69 @@
+# electron-builder configuration for VisionIQ
+# Run from: frontend/  via  npm run electron:build
+# Output:   dist-electron/  (NSIS installer .exe)
+
+appId:       com.visioniq.app
+productName: VisionIQ
+copyright:   "© 2025 VisionIQ"
+
+# Entry point: the Electron main process
+# paths are relative to the frontend/ directory where npm run is executed
+directories:
+  buildResources: "../electron/assets"
+  output:         "../dist-electron"
+
+# Main process entry (relative to frontend/)
+main: "../electron/main.js"
+
+# Files to include in the packaged app
+files:
+  # Electron main & preload
+  - "../electron/main.js"
+  - "../electron/preload.js"
+  - "../electron/splash.html"
+  # Built React frontend
+  - "dist/**/*"
+  # App icon
+  - "public/icon.png"
+
+# Extra resources bundled OUTSIDE the asar (accessible at process.resourcesPath)
+extraResources:
+  # Bundled Python backend (built by PyInstaller)
+  - from: "../backend/dist/visioniq_server"
+    to:   "backend"
+    filter:
+      - "**/*"
+  # Frontend dist (also copied here for the main process path resolution)
+  - from: "dist"
+    to:   "frontend/dist"
+    filter:
+      - "**/*"
+
+# Windows NSIS installer
+win:
+  target:
+    - target: nsis
+      arch:   [x64]
+  icon: "../frontend/public/icon.png"
+
+nsis:
+  oneClick:              false
+  allowToChangeInstallationDirectory: true
+  installerIcon:         "../frontend/public/icon.png"
+  uninstallerIcon:       "../frontend/public/icon.png"
+  installerHeaderIcon:   "../frontend/public/icon.png"
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName:          "VisionIQ"
+  license:               "../LICENSE.txt"
+  runAfterFinish:        true
+
+# Mac (optional — for future use)
+mac:
+  target: dmg
+  icon:   "../frontend/public/icon.png"
+
+# Linux (optional)
+linux:
+  target: AppImage
+  icon:   "../frontend/public/icon.png"

@@ -6,7 +6,7 @@ import DashboardPage from "./pages/DashboardPage.jsx";
 import HistoryPage from "./pages/HistoryPage.jsx";
 import ModelStatusPage from "./pages/ModelStatusPage.jsx";
 
-const API_BASE = "";
+const API_BASE = window.electronAPI?.apiBase ?? "";
 
 const PAGE_TITLES = {
   dashboard:      { sub: "Detects: Male · Female · Animal" },
