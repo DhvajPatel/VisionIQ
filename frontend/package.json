@@ -50,11 +50,6 @@
         "from":   "../backend/dist/visioniq_server",
         "to":     "backend",
         "filter": ["**/*"]
-      },
-      {
-        "from":   "dist",
-        "to":     "frontend/dist",
-        "filter": ["**/*"]
       }
     ],
     "win": {
