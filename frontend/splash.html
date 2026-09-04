@@ -166,9 +166,17 @@
   <div class="version">v1.0.0</div>
 
   <script>
-    // Receive status updates from main process
     if (typeof require !== "undefined") {
       const { ipcRenderer } = require("electron");
+
+      // "set-status" — direct status text from backend stdout
+      ipcRenderer.on("set-status", (_, { msg, color }) => {
+        const el = document.getElementById("status");
+        el.textContent = msg;
+        if (color) el.style.color = color;
+      });
+
+      // "backend-status" — from health check JSON
       ipcRenderer.on("backend-status", (_, data) => {
         const el = document.getElementById("status");
         if (data.models_loaded) {

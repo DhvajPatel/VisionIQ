@@ -207,5 +207,22 @@ def delete_entry(entry_id: int):
 
 
 if __name__ == "__main__":
+    import sys
+    import asyncio
     import uvicorn
-    uvicorn.run("app:app", host="127.0.0.1", port=8000, reload=False)
+
+    async def _serve():
+        config = uvicorn.Config(
+            app=app,           # pass object — never a string
+            host="127.0.0.1",
+            port=8000,
+            reload=False,
+            log_level="info",
+            loop="asyncio",
+            # Disable lifespan so uvicorn doesn't try to re-import the app
+            lifespan="off",
+        )
+        server = uvicorn.Server(config)
+        await server.serve()
+
+    asyncio.run(_serve())

@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+backend/history.db
+
+# PyInstaller build output
+backend/build/
+backend/dist/
+
+# Model cache (large binary files — run cache_models.py to regenerate)
+backend/models_cache/
+
+# Node
+frontend/node_modules/
+frontend/dist/
+frontend/package-lock.json
+
+# Electron build output
+dist-electron/
+
+# Render
+render.yaml
+
+# IDE / OS
+.vscode/settings.json
+.DS_Store
+Thumbs.db
+*.log

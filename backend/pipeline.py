@@ -1,23 +1,16 @@
 """
-pipeline.py — VisionIQ inference core (render-optimised, float16).
+pipeline.py — VisionIQ inference core (desktop edition, fully offline).
 
-Render free tier: 512 MB RAM, no GPU.
-
-RAM budget (float16):
-  OS + Python runtime  ~100 MB
-  torch CPU base       ~150 MB
-  MTCNN                 ~50 MB
-  ViT-B/16 float16     ~165 MB  ← halved from 330 MB
-  ResNet50 float16      ~50 MB  ← halved from 100 MB
-  ─────────────────────────────
-  Total                ~515 MB  ← tight but fits with swap headroom
-
-float16 on CPU: torch supports it via .half(), inference accuracy unchanged.
+All model weights are bundled inside the installer (no internet required).
+Paths are resolved automatically for both dev and PyInstaller environments.
 """
 
 from dataclasses import dataclass, field
 from typing import List, Optional, Tuple
 import logging
+import os
+import sys
+from pathlib import Path
 
 import torch
 import torch.nn.functional as F
@@ -27,6 +20,40 @@ from torchvision.models import resnet50, ResNet50_Weights
 from transformers import AutoImageProcessor, AutoModelForImageClassification
 
 logger = logging.getLogger("visioniq.pipeline")
+
+# ── Resolve model cache path ──────────────────────────────────────────────────
+# In PyInstaller bundle: sys._MEIPASS/_internal points to extracted files
+# The models_cache/ folder is bundled alongside the exe
+def _get_models_cache() -> Path:
+    if getattr(sys, "frozen", False):
+        # Running as PyInstaller bundle — models_cache is next to the exe
+        exe_dir = Path(sys.executable).parent
+        candidate = exe_dir / "models_cache"
+        if candidate.exists():
+            return candidate
+        # Also check _internal (onedir layout)
+        candidate2 = Path(sys._MEIPASS).parent / "models_cache"
+        if candidate2.exists():
+            return candidate2
+        # Fallback: same dir as exe
+        return exe_dir / "models_cache"
+    else:
+        # Dev mode — models_cache is in backend/
+        return Path(__file__).parent / "models_cache"
+
+MODELS_CACHE = _get_models_cache()
+HF_CACHE     = MODELS_CACHE / "hub"
+TORCH_CACHE  = MODELS_CACHE / "torch"
+
+# Force all HuggingFace and torch downloads to the bundled cache
+os.environ["HF_HOME"]               = str(MODELS_CACHE)
+os.environ["HUGGINGFACE_HUB_CACHE"] = str(HF_CACHE)
+os.environ["TRANSFORMERS_CACHE"]    = str(HF_CACHE)
+os.environ["TORCH_HOME"]            = str(TORCH_CACHE)
+os.environ["HF_HUB_DISABLE_TELEMETRY"] = "1"
+os.environ["HF_HUB_OFFLINE"]        = "1"   # ← KEY: never try to download
+
+logger.info("Models cache: %s (exists=%s)", MODELS_CACHE, MODELS_CACHE.exists())
 
 # ── constants ────────────────────────────────────────────────────────────────
 
@@ -101,13 +128,18 @@ class VisionIQEngine:
         )
 
         # ── ViT-B/16 gender classifier loaded in float16 (~165 MB) ──────────
-        logger.info("Loading ViT-B/16 in float16…")
+        logger.info("Loading ViT-B/16 in float16… (cache: %s)", HF_CACHE)
+        MODEL_ID = "rizvandwiki/gender-classification"
         self.gender_processor = AutoImageProcessor.from_pretrained(
-            "rizvandwiki/gender-classification"
+            MODEL_ID,
+            cache_dir=str(HF_CACHE),
+            local_files_only=True,
         )
         self.gender_model = AutoModelForImageClassification.from_pretrained(
-            "rizvandwiki/gender-classification",
-            torch_dtype=torch.float16,
+            MODEL_ID,
+            cache_dir=str(HF_CACHE),
+            local_files_only=True,
+            dtype=torch.float16,
             low_cpu_mem_usage=True,
         ).eval()
         # Build id→label map

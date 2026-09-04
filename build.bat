@@ -36,8 +36,7 @@ echo    Prerequisites OK
 
 :: ── 2. Install / verify Python deps ──────────────────────────────────────────
 echo.
-echo [2/5] Verifying Python dependencies...
-cd /d "%BACKEND%"
+echo [2/5] Verifying Python dependencies...cd /d "%BACKEND%"
 
 :: Check if torch is already installed (any version >= 2.5)
 python -c "import torch; print('torch', torch.__version__)" >nul 2>&1
@@ -73,7 +72,28 @@ if errorlevel 1 (
 
 echo    All Python deps OK
 
-:: ── 3. Quick backend smoke-test ───────────────────────────────────────────────
+:: ── 2b. Cache models offline ──────────────────────────────────────────────────
+echo.
+echo [2b] Caching AI model weights offline...
+cd /d "%BACKEND%"
+if not exist "models_cache\hub\models--rizvandwiki--gender-classification" (
+    echo    Downloading ViT-B/16 + ResNet50 (~430 MB, one-time)...
+    python cache_models.py
+    if errorlevel 1 ( echo ERROR: cache_models.py failed & pause & exit /b 1 )
+) else (
+    echo    models_cache already populated - skipping download
+)
+
+:: Ensure ResNet50 weights are also present
+if not exist "models_cache\torch\hub\checkpoints\resnet50-11ad3fa6.pth" (
+    echo    Copying ResNet50 from torch cache...
+    if exist "%USERPROFILE%\.cache\torch\hub\checkpoints\resnet50-11ad3fa6.pth" (
+        if not exist "models_cache\torch\hub\checkpoints" mkdir "models_cache\torch\hub\checkpoints"
+        copy "%USERPROFILE%\.cache\torch\hub\checkpoints\resnet50-11ad3fa6.pth" "models_cache\torch\hub\checkpoints\" /Y
+    ) else (
+        echo    WARNING: ResNet50 not in user cache - it will download on first run
+    )
+)
 echo.
 echo [2b] Smoke-testing backend imports...
 python -c "
@@ -101,6 +121,16 @@ if exist "dist\visioniq_server" (
 )
 python -m PyInstaller visioniq_server.spec --noconfirm
 if errorlevel 1 ( echo ERROR: PyInstaller build failed & pause & exit /b 1 )
+
+:: Copy models_cache into dist (PyInstaller bundles it in TOC but doesn't always copy large dirs)
+echo    Copying offline model cache into dist...
+if not exist "dist\visioniq_server\models_cache" (
+    xcopy /E /I /Q "models_cache" "dist\visioniq_server\models_cache"
+    if errorlevel 1 ( echo ERROR: Could not copy models_cache & pause & exit /b 1 )
+    echo    models_cache copied OK
+) else (
+    echo    models_cache already present in dist
+)
 echo    Backend build OK  ->  backend\dist\visioniq_server\
 
 :: ── 5. Vite — build React frontend ───────────────────────────────────────────
