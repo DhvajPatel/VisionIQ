@@ -1,6 +1,10 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
+// Works in both Electron (window.electronAPI.apiBase = "http://127.0.0.1:8000")
+// and browser dev mode (empty string → relative URL via Vite proxy)
+const API_BASE = window.electronAPI?.apiBase ?? "";
+
 const CATEGORY_COLOR = {
   person:  { bg: "bg-blue-500/20",  text: "text-blue-500",  label: "Person"  },
   animal:  { bg: "bg-green-500/20", text: "text-green-600", label: "Animal"  },
@@ -18,7 +22,7 @@ export default function HistoryPage() {
     setLoading(true);
     setError(null);
     try {
-      const r = await fetch("/api/history?limit=100");
+      const r = await fetch(`${API_BASE}/api/history?limit=100`);
       if (!r.ok) throw new Error(`Server returned ${r.status}`);
       const d = await r.json();
       setEntries(Array.isArray(d) ? d : []);
@@ -35,7 +39,7 @@ export default function HistoryPage() {
     if (!window.confirm("Clear all analysis history? This cannot be undone.")) return;
     setClearing(true);
     try {
-      await fetch("/api/history", { method: "DELETE" });
+      await fetch(`${API_BASE}/api/history`, { method: "DELETE" });
       setEntries([]);
       setSelected(null);
     } catch {
@@ -46,7 +50,7 @@ export default function HistoryPage() {
 
   const deleteOne = async (id) => {
     try {
-      await fetch(`/api/history/${id}`, { method: "DELETE" });
+      await fetch(`${API_BASE}/api/history/${id}`, { method: "DELETE" });
       setEntries((e) => e.filter((x) => x.id !== id));
       if (selected?.id === id) setSelected(null);
     } catch {
@@ -106,7 +110,7 @@ export default function HistoryPage() {
             <p className="text-sm font-semibold text-red-500">Backend not reachable</p>
             <p className="text-xs text-tx-muted mt-0.5">{error}</p>
             <p className="text-xs text-tx-muted mt-1">
-              Start the backend: <code className="bg-bg-hover px-1.5 py-0.5 rounded text-accent-purple font-mono">python app.py</code> then click Refresh.
+              The backend is starting up — please wait a moment and click Refresh.
             </p>
           </div>
         </motion.div>

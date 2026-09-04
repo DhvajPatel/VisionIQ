@@ -36,7 +36,7 @@ export default function Sidebar({ active, onNav, health, onClose }) {
         className="flex items-center gap-3 px-5 py-4 border-b border-border-subtle"
       >
         <div className="w-9 h-9 rounded-xl overflow-hidden shrink-0 shadow-glow">
-          <img src="/icon.png" alt="VisionIQ" className="w-full h-full object-cover" />
+          <img src="./icon.png" alt="VisionIQ" className="w-full h-full object-cover" />
         </div>
         <div className="leading-tight min-w-0 flex-1">
           <p className="text-sm font-bold text-tx-primary tracking-wide truncate">VisionIQ</p>
