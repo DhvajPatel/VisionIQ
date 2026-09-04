@@ -1,5 +1,5 @@
 /**
- * main.js — VisionIQ Electron Main Process
+ * main.js — VisionIQ Electron Main Process  v2.1.0
  *
  * Flow:
  *   1. Show splash window immediately
@@ -20,31 +20,74 @@ const { spawn, execSync } = require("child_process");
 const BACKEND_PORT    = 8000;
 const BACKEND_HOST    = "127.0.0.1";
 const HEALTH_URL      = `http://${BACKEND_HOST}:${BACKEND_PORT}/api/health`;
-const POLL_INTERVAL   = 2000;    // ms between health checks
-const STARTUP_TIMEOUT = 300000;  // 5 min — first run loads ~500 MB of weights
+const POLL_INTERVAL   = 2000;
+const STARTUP_TIMEOUT = 300000;  // 5 min
 
 const isDev = !app.isPackaged;
 
-// ── path resolution ───────────────────────────────────────────────────────────
+// ── path helpers ──────────────────────────────────────────────────────────────
+//
+// IMPORTANT: In a packaged Electron app:
+//   - main.js lives inside app.asar  → __dirname = "/path/to/app.asar" (virtual)
+//   - app.getAppPath() returns the real path to app.asar
+//   - process.resourcesPath = ".../resources"  (real filesystem)
+//
+// Files packed via electron-builder "files" are inside app.asar.
+// Files packed via "extraResources" are at process.resourcesPath (real FS).
+//
+// Our layout:
+//   resources/
+//     app.asar          ← main.js, preload.js, splash.html, dist/**  (in asar)
+//     backend/          ← visioniq_server.exe + models_cache  (extraResources)
+//     frontend/dist/    ← index.html + assets  (extraResources copy)
+//     elevate.exe
+
+function appFile(...parts) {
+  // Files inside app.asar  (main.js, preload.js, splash.html)
+  // Use app.getAppPath() which returns the correct asar path
+  return path.join(app.getAppPath(), ...parts);
+}
+
+function resourceFile(...parts) {
+  // Files in extraResources  (backend exe, frontend/dist)
+  return path.join(process.resourcesPath, ...parts);
+}
+
 function getBackendExe() {
   if (isDev) {
-    // Dev: pre-built exe lives in backend/dist/
     const devExe = path.join(__dirname, "..", "backend", "dist", "visioniq_server", "visioniq_server.exe");
     if (fs.existsSync(devExe)) return { exe: devExe, cwd: path.dirname(devExe) };
-    return null; // fall back to python
+    return null;
   }
-  // Production: bundled as extraResources → resources/backend/
-  const exe = path.join(process.resourcesPath, "backend", "visioniq_server.exe");
+  const exe = resourceFile("backend", "visioniq_server.exe");
   return { exe, cwd: path.dirname(exe) };
 }
 
 function getFrontendIndex() {
   if (isDev) return path.join(__dirname, "dist", "index.html");
-  return path.join(process.resourcesPath, "frontend", "dist", "index.html");
+  // Try extraResources copy first
+  const extPath = resourceFile("frontend", "dist", "index.html");
+  if (fs.existsSync(extPath)) return extPath;
+  // Fall back to inside asar
+  return appFile("dist", "index.html");
 }
 
-function getSplashHtml() {
-  return path.join(__dirname, "splash.html");
+function getPreloadPath() {
+  if (isDev) return path.join(__dirname, "preload.js");
+  // preload.js is inside app.asar
+  return appFile("preload.js");
+}
+
+function getSplashPath() {
+  if (isDev) return path.join(__dirname, "splash.html");
+  return appFile("splash.html");
+}
+
+function getIconPath() {
+  if (isDev) return path.join(__dirname, "public", "icon.ico");
+  const extIco = resourceFile("frontend", "dist", "icon.ico");
+  if (fs.existsSync(extIco)) return extIco;
+  return appFile("public", "icon.ico");
 }
 
 // ── globals ───────────────────────────────────────────────────────────────────
@@ -61,7 +104,7 @@ function createSplash() {
     resizable: false, alwaysOnTop: true, center: true,
     webPreferences: { nodeIntegration: false, contextIsolation: true },
   });
-  splashWin.loadFile(getSplashHtml());
+  splashWin.loadFile(getSplashPath());
   splashWin.on("closed", () => { splashWin = null; });
 }
 
@@ -73,20 +116,45 @@ function sendSplashStatus(msg, color) {
 
 // ── main window ───────────────────────────────────────────────────────────────
 function createMainWindow() {
+  const indexPath   = getFrontendIndex();
+  const preloadPath = getPreloadPath();
+  const iconPath    = getIconPath();
+
+  console.log("[main] index.html:", indexPath, "exists:", fs.existsSync(indexPath));
+  console.log("[main] preload.js:", preloadPath);
+  console.log("[main] icon.ico:  ", iconPath);
+
   mainWin = new BrowserWindow({
     width: 1280, height: 800, minWidth: 800, minHeight: 600,
     show: false,
     title: "VisionIQ — AI Vision",
-    icon: path.join(__dirname, "public", "icon.ico"),
+    icon: fs.existsSync(iconPath) ? iconPath : undefined,
     webPreferences: {
-      preload: path.join(__dirname, "preload.js"),
+      preload: preloadPath,
       nodeIntegration: false,
       contextIsolation: true,
       webSecurity: false,   // allow file:// → http://127.0.0.1 fetch
     },
   });
 
-  mainWin.loadFile(getFrontendIndex());
+  if (!fs.existsSync(indexPath)) {
+    dialog.showErrorBox("VisionIQ — Missing Frontend",
+      `Could not find index.html at:\n${indexPath}\n\nPlease reinstall the application.`);
+    app.quit();
+    return;
+  }
+
+  mainWin.loadFile(indexPath)
+    .catch((err) => {
+      console.error("[main] loadFile failed:", err);
+      // Fallback: load as URL
+      mainWin.loadURL(`file://${indexPath.replace(/\\/g, "/")}`);
+    });
+
+  // Also handle did-fail-load
+  mainWin.webContents.on("did-fail-load", (event, code, desc, url) => {
+    console.error("[main] Page failed to load:", code, desc, url);
+  });
 
   mainWin.once("ready-to-show", () => {
     if (splashWin && !splashWin.isDestroyed()) splashWin.close();
@@ -108,11 +176,10 @@ function startBackend() {
 
   if (result) {
     const { exe, cwd } = result;
-    console.log("[backend] Spawning exe:", exe);
-    console.log("[backend] Working dir:", cwd);
+    console.log("[backend] Spawning:", exe);
+    console.log("[backend] CWD:", cwd);
 
     if (!fs.existsSync(exe)) {
-      console.error("[backend] EXE NOT FOUND:", exe);
       dialog.showErrorBox("VisionIQ — Backend Missing",
         `Backend executable not found:\n${exe}\n\nPlease reinstall the application.`);
       app.quit();
@@ -121,9 +188,8 @@ function startBackend() {
 
     backendProc = spawn(exe, [], { cwd, stdio: "pipe", windowsHide: true });
   } else {
-    // Dev python fallback
     const backendDir = path.join(__dirname, "..", "backend");
-    console.log("[backend] Dev mode: python app.py in", backendDir);
+    console.log("[backend] Dev fallback: python app.py in", backendDir);
     backendProc = spawn("python", ["app.py"], {
       cwd: backendDir, stdio: "pipe", windowsHide: true,
     });
@@ -132,12 +198,11 @@ function startBackend() {
   backendProc.stdout.on("data", (d) => {
     const line = d.toString().trim();
     console.log("[PY]", line);
-    // Forward key log lines to the splash
-    if (line.includes("Loading MTCNN"))          sendSplashStatus("Loading face detector…", null);
-    if (line.includes("Loading ViT"))             sendSplashStatus("Loading gender classifier…", null);
-    if (line.includes("Loading ResNet"))          sendSplashStatus("Loading animal classifier…", null);
-    if (line.includes("All models ready"))        sendSplashStatus("Models ready — launching…", "#22c55e");
-    if (line.includes("Application startup"))     sendSplashStatus("Starting server…", null);
+    if (line.includes("Loading MTCNN"))       sendSplashStatus("Loading face detector…", null);
+    if (line.includes("Loading ViT"))         sendSplashStatus("Loading gender classifier…", null);
+    if (line.includes("Loading ResNet"))      sendSplashStatus("Loading animal classifier…", null);
+    if (line.includes("All models ready"))    sendSplashStatus("Models ready — launching…", "#22c55e");
+    if (line.includes("Application startup")) sendSplashStatus("Starting server…", null);
   });
 
   backendProc.stderr.on("data", (d) => {
@@ -146,14 +211,11 @@ function startBackend() {
   });
 
   backendProc.on("exit", (code, signal) => {
-    console.log(`[backend] Process exited: code=${code} signal=${signal}`);
-    if (code !== 0 && code !== null && !app.isQuitting) {
-      // Unexpected crash — show error if no window is open yet
-      if (!mainWin) {
-        dialog.showErrorBox("VisionIQ — Backend Crashed",
-          `The AI backend stopped unexpectedly (exit code ${code}).\n\nPlease restart the application.`);
-        app.quit();
-      }
+    console.log(`[backend] Exited: code=${code} signal=${signal}`);
+    if (code !== 0 && code !== null && !app.isQuitting && !mainWin) {
+      dialog.showErrorBox("VisionIQ — Backend Crashed",
+        `The AI backend stopped unexpectedly (exit code ${code}).\n\nPlease restart the application.`);
+      app.quit();
     }
   });
 
@@ -168,28 +230,19 @@ function startBackend() {
 // ── health polling ────────────────────────────────────────────────────────────
 function pollHealth(onReady, onTimeout) {
   const deadline = Date.now() + STARTUP_TIMEOUT;
-  let attempt = 0;
 
   function check() {
-    attempt++;
     const req = http.get(HEALTH_URL, (res) => {
       let body = "";
       res.on("data", (c) => { body += c; });
       res.on("end", () => {
         try {
           const data = JSON.parse(body);
-          if (splashWin && !splashWin.isDestroyed()) {
+          if (splashWin && !splashWin.isDestroyed())
             splashWin.webContents.send("backend-status", data);
-          }
-          if (data.models_loaded) {
-            clearTimeout(pollTimer);
-            onReady();
-          } else {
-            scheduleNext();
-          }
-        } catch (_) {
-          scheduleNext();
-        }
+          if (data.models_loaded) { clearTimeout(pollTimer); onReady(); }
+          else scheduleNext();
+        } catch (_) { scheduleNext(); }
       });
     });
     req.on("error", () => scheduleNext());
@@ -201,51 +254,39 @@ function pollHealth(onReady, onTimeout) {
     pollTimer = setTimeout(check, POLL_INTERVAL);
   }
 
-  // First check after 2 s (give the process time to start)
   pollTimer = setTimeout(check, 2000);
 }
 
 // ── kill backend ──────────────────────────────────────────────────────────────
 function killBackend() {
   if (!backendProc) return;
-  console.log("[backend] Killing process PID:", backendProc.pid);
-  try {
-    backendProc.kill("SIGTERM");
-  } catch (_) {}
-  // Windows: force-kill entire process tree
+  try { backendProc.kill("SIGTERM"); } catch (_) {}
   if (process.platform === "win32" && backendProc.pid) {
     try { execSync(`taskkill /PID ${backendProc.pid} /F /T`, { stdio: "ignore" }); } catch (_) {}
   }
   backendProc = null;
 }
 
-// ── app lifecycle ─────────────────────────────────────────────────────────────
+// ── lifecycle ─────────────────────────────────────────────────────────────────
 app.whenReady().then(() => {
   createSplash();
   sendSplashStatus("Starting AI backend…", null);
   startBackend();
 
   pollHealth(
+    () => createMainWindow(),
     () => {
-      // Models ready → open main window
-      createMainWindow();
-    },
-    () => {
-      // Timed out after 5 min
       if (splashWin && !splashWin.isDestroyed()) splashWin.close();
       const choice = dialog.showMessageBoxSync({
         type: "warning",
         title: "VisionIQ — Slow Start",
         message: "Models are still loading (taking longer than 5 minutes).",
-        detail: "This can happen on the very first run while model weights are read from disk.\nOpen the app anyway — it will become fully functional once loading completes.",
+        detail: "This can happen on the very first run.\nOpen the app anyway?",
         buttons: ["Open Anyway", "Quit"],
         defaultId: 0,
       });
-      if (choice === 0) {
-        createMainWindow();
-      } else {
-        app.quit();
-      }
+      if (choice === 0) createMainWindow();
+      else app.quit();
     }
   );
 
@@ -265,6 +306,5 @@ app.on("before-quit", () => {
   killBackend();
 });
 
-// ── IPC ───────────────────────────────────────────────────────────────────────
 ipcMain.handle("get-app-version", () => app.getVersion());
 ipcMain.handle("open-external",   (_, url) => shell.openExternal(url));

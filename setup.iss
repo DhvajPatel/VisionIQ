@@ -11,10 +11,10 @@
 ;   OR run from command line:
 ;      "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" setup.iss
 ;
-; Output: installer\VisionIQ_Setup_1.0.0.exe
+; Output: installer\VisionIQ_Setup_2.1.0.exe
 
 #define MyAppName      "VisionIQ"
-#define MyAppVersion   "1.0.0"
+#define MyAppVersion   "2.1.0"
 #define MyAppPublisher "VisionIQ"
 #define MyAppURL       "https://vision-iq-one.vercel.app"
 #define MyAppExeName   "VisionIQ.exe"

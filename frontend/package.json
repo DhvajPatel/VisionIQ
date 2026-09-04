@@ -2,7 +2,7 @@
   "name": "visioniq",
   "productName": "VisionIQ",
   "private": true,
-  "version": "1.0.0",
+  "version": "2.1.0",
   "description": "AI-powered image recognition desktop app",
   "author": "VisionIQ",
   "main": "main.js",
